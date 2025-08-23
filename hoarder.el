@@ -24,14 +24,16 @@
   "Hoarder client for Emacs."
   :group 'applications)
 
-(defcustom hoarder-server-url "http://localhost:3000"
+(defcustom hoarder-server-url
+  (or (getenv "HOARDER_SERVER_URL") "http://localhost:3000")
   "Base URL of your Karakeep server.
 For self-hosted instances, this should be your server URL.
 For the demo instance, use https://try.karakeep.app"
   :type 'string
   :group 'hoarder)
 
-(defcustom hoarder-api-key ""
+(defcustom hoarder-api-key
+  (or (getenv "HOARDER_API_KEY") "")
   "API key for Karakeep (Bearer token).
 For self-hosted instances, this should be your API key.
 For the demo instance, you can get one after logging in."

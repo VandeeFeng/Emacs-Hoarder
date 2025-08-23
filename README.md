@@ -26,7 +26,13 @@ An Emacs client for [Hoarder](https://hoarder.app), allowing you to manage your 
 
 ## Configuration
 
-You can customize the following variables:
+You can customize the following variables or set environment variables `HOARDER_API_KEY` and `HOARDER_SERVER_URL` in your shell (e.g., in `~/.bashrc`) 
+
+```bash
+export HOARDER_API_KEY='your-hoarder-api-key'
+export HOARDER_SERVER_URL='https://your-hoarder-server'
+```
+Or in Emacs:
 
 ```elisp
 ;; Set your API key (will be prompted if not set)
