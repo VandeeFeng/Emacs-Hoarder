@@ -48,7 +48,7 @@ For the demo instance, you can get one after logging in."
   :type 'directory
   :group 'hoarder)
 
-(defcustom hoarder-update-existing-files nil
+(defcustom hoarder-update-existing-files t
   "Whether to update or skip existing bookmark files."
   :type 'boolean
   :group 'hoarder)
@@ -403,11 +403,77 @@ Preserves Chinese characters and other valid Unicode characters."
     (message "Processing %d bookmarks..." (length all-bookmarks))
     (hoarder--process-bookmarks all-bookmarks)))
 
-(defun hoarder-sync ()
-  "Sync bookmarks from Hoarder to local files."
+(defvar hoarder--last-sync-time nil
+  "Timestamp of the last successful sync.")
+
+(defun hoarder--save-last-sync-time ()
+  "Save the current time as last sync time." 
+  (setq hoarder--last-sync-time (current-time-string))
+  (with-temp-file (expand-file-name ".last-sync-time" hoarder-sync-folder)
+    (insert hoarder--last-sync-time)))
+
+(defun hoarder--load-last-sync-time ()
+  "Load last sync time from file."  
+  (let ((path (expand-file-name ".last-sync-time" hoarder-sync-folder)))
+    (when (file-exists-p path)
+      (setq hoarder--last-sync-time
+            (with-temp-buffer
+              (insert-file-contents path)
+              (buffer-string)))))
+  hoarder--last-sync-time)
+
+(defun hoarder--parse-time-string (time-string)
+  "Parse ISO8601 TIME-STRING into time value."  
+  (ignore-errors (date-to-time time-string))
+  )
+
+(defun hoarder-sync (&optional force)
+  "Sync bookmarks from Hoarder to local files incrementally or force sync.
+If FORCE is non-nil, sync all bookmarks ignoring modified time."
   (interactive)
-  (message "Starting Hoarder sync...")
-  (hoarder-fetch-all-bookmarks))
+  (hoarder--ensure-directory hoarder-sync-folder)
+  (unless force
+    (hoarder--load-last-sync-time))
+  (message "Starting Hoarder%s sync from %s..."
+           (if force " forced" " incremental")
+           (if hoarder--last-sync-time hoarder--last-sync-time "the beginning"))
+
+  (let ((all-bookmarks '())
+        (cursor nil)
+        (has-more t))
+    (while has-more
+      (let* ((params `(("limit" . 100)
+                       ,@(when cursor `(("cursor" . ,cursor)))
+                       ,@(when hoarder-exclude-archived `(("archived" . "false")))
+                       ,@(when hoarder-only-favorites `(("favourited" . "true")))))
+             (response (hoarder--make-request "/bookmarks" "GET" params nil))
+             (bookmarks (alist-get 'bookmarks response))
+             (next-cursor (alist-get 'nextCursor response)))
+        ;; Filter bookmarks modified after last sync time unless forced
+        (unless force
+          (if hoarder--last-sync-time
+              (setq bookmarks
+                    (seq-filter (lambda (b)
+                                  (let* ((mod-time-str (alist-get 'modifiedAt b))
+                                         (mod-time (hoarder--parse-time-string mod-time-str))
+                                         (last-sync-time (hoarder--parse-time-string hoarder--last-sync-time)))
+                                    (or (null mod-time) ; If no mod time, consider it changed
+                                        (not (time-less-p mod-time last-sync-time)))))
+                                bookmarks))))
+        (setq all-bookmarks (append all-bookmarks bookmarks))
+        (if next-cursor
+            (setq cursor next-cursor)
+          (setq has-more nil))
+        (message "Fetched %d bookmarks so far..." (length all-bookmarks))))
+    (message "Processing %d bookmarks..." (length all-bookmarks))
+    (hoarder--process-bookmarks all-bookmarks)
+    (hoarder--save-last-sync-time)
+    (message "Hoarder%s sync completed." (if force " forced" " incremental"))))
+
+(defun hoarder-force-sync ()
+  "Force sync all bookmarks from Hoarder to local files."
+  (interactive)
+  (hoarder-sync t))
 
 (provide 'hoarder)
 ;;; hoarder.el ends here 

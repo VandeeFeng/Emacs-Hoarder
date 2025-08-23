@@ -37,9 +37,9 @@ You can customize the following variables:
 (setq hoarder-sync-folder "~/your/path/")
 
 ;; Other options
-(setq hoarder-update-existing-files t)  ; Update existing files during sync
-(setq hoarder-exclude-archived t)       ; Exclude archived bookmarks
-(setq hoarder-only-favorites nil)       ; Only sync favorite bookmarks
+(setq hoarder-update-existing-files t)  ; Update existing files during sync,default t
+(setq hoarder-exclude-archived t)       ; Exclude archived bookmarks,default t
+(setq hoarder-only-favorites nil)       ; Only sync favorite bookmarks,defult nil
 ```
 
 ## Usage
@@ -54,7 +54,8 @@ You can customize the following variables:
    - `C-c h b`: Browse local bookmarks
 
 3. Commands:
-   - `M-x hoarder-sync`: Manually sync bookmarks
+   - `M-x hoarder-sync`: Incrementally sync bookmarks (only changed since last sync)
+   - `M-x hoarder-force-sync`: Force sync all bookmarks
    - `M-x hoarder-browse-bookmarks`: Browse and open bookmarks
 
 ## File Format
