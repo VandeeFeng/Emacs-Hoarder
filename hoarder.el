@@ -17,6 +17,7 @@
 (require 'json)
 (require 'url)
 (require 'url-http)
+(require 'auth-source)
 
 (defvar url-mime-charset-string "utf-8")
 
