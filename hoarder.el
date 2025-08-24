@@ -210,6 +210,7 @@ Optional LIMIT for number of results (default 100)."
            (tags (mapcar (lambda (tag)
                            (alist-get 'name tag))
                          (alist-get 'tags bookmark))))
+
       ;; Insert title and properties
       (insert (format "* %s\n" title))
       (insert ":PROPERTIES:\n")
@@ -255,44 +256,43 @@ Optional LIMIT for number of results (default 100)."
                       "Untitled"))
            (highlights (alist-get 'highlights bookmark))
            (tags (mapcar (lambda (tag)
-                           (concat "#" (alist-get 'name tag)))
+                           (alist-get 'name tag))
                          (alist-get 'tags bookmark))))
+
       ;; Insert YAML frontmatter
-      (insert "---\n")
+      (insert "---\n\n")
       (insert (format "title: %s\n" title))
       (when url
         (insert (format "url: %s\n" url)))
       (insert (format "type: %s\n" type))
-      (insert (format "created: %s\n" (alist-get 'createdAt bookmark))))
-    (when (alist-get 'modifiedAt bookmark)
-      (insert (format "modified: %s\n" (alist-get 'modifiedAt bookmark))))
-    (when tags
-      (insert "tags:\n")
-      (dolist (tag tags)
-        (insert (format "  - %s\n" tag))))
-    (insert "---\n\n")
+      (insert (format "created: %s\n" (alist-get 'createdAt bookmark)))
+      (when (alist-get 'modifiedAt bookmark)
+        (insert (format "modified: %s\n" (alist-get 'modifiedAt bookmark))))
+      (when tags
+        (insert "tags:\n")
+        (dolist (tag tags)
+          (insert (format "  - %s\n" tag))))
+      (insert "---\n\n")
 
-    ;; Insert URL as markdown link
-    (when url
-      (insert (format "[%s](%s)\n\n" title url)))
+      ;; Insert URL as markdown link
+      (when url
+        (insert (format "[%s](%s)\n\n" title url)))
 
-    ;; Insert highlights if exists
-    (when highlights
-      (insert "\n## Highlights\n\n")
-      (dolist (highlight highlights)
-        (let ((text (alist-get 'text highlight))
-              (note (alist-get 'note highlight)))
-          (when text
-            (insert (format "> %s\n\n" text))
-            (when note
-              (insert (format "%s\n\n" note)))))))
-    
-    (when-let ((note (alist-get 'note bookmark)))
-      (insert "
-## Notes
+      ;; Insert highlights if exists
+      (when highlights
+        (insert "\n## Highlights\n\n")
+        (dolist (highlight highlights)
+          (let ((text (alist-get 'text highlight))
+                (note (alist-get 'note highlight)))
+            (when text
+              (insert (format "> %s\n\n" text))
+              (when note
+                (insert (format "%s\n\n" note)))))))
 
-")
-      (insert note))
+      ;; Insert note if exists
+      (when-let ((note (alist-get 'note bookmark)))
+        (insert "\n## Notes\n\n")
+        (insert note)))
     (buffer-string)))
 
 (defun hoarder--format-bookmark (bookmark)
@@ -411,13 +411,13 @@ Preserves Chinese characters and other valid Unicode characters."
   "Timestamp of the last successful sync.")
 
 (defun hoarder--save-last-sync-time ()
-  "Save the current time as last sync time." 
+  "Save the current time as last sync time."
   (setq hoarder--last-sync-time (current-time-string))
   (with-temp-file (expand-file-name ".last-sync-time" hoarder-sync-folder)
     (insert hoarder--last-sync-time)))
 
 (defun hoarder--load-last-sync-time ()
-  "Load last sync time from file."  
+  "Load last sync time from file."
   (let ((path (expand-file-name ".last-sync-time" hoarder-sync-folder)))
     (when (file-exists-p path)
       (setq hoarder--last-sync-time
@@ -427,7 +427,7 @@ Preserves Chinese characters and other valid Unicode characters."
   hoarder--last-sync-time)
 
 (defun hoarder--parse-time-string (time-string)
-  "Parse ISO8601 TIME-STRING into time value."  
+  "Parse ISO8601 TIME-STRING into time value."
   (ignore-errors (date-to-time time-string))
   )
 
@@ -571,4 +571,4 @@ If FORCE is non-nil, sync all bookmarks ignoring modified time."
       (message "Hoarder tag '%s' sync completed." tag-name))))
 
 (provide 'hoarder)
-;;; hoarder.el ends here 
+;;; hoarder.el ends here
