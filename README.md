@@ -50,6 +50,7 @@ In Emacs:
 (setq hoarder-sync-folder "~/your/path/")
 
 ;; Other options
+(setq hoarder-file-format 'markdown)    ; set file format, org as default
 (setq hoarder-update-existing-files t)  ; Update existing files during sync,default t
 (setq hoarder-exclude-archived t)       ; Exclude archived bookmarks,default t
 (setq hoarder-only-favorites nil)       ; Only sync favorite bookmarks,defult nil
@@ -70,6 +71,7 @@ In Emacs:
    - `M-x hoarder-sync`: Incrementally sync bookmarks (only changed since last sync)
    - `M-x hoarder-force-sync`: Force sync all bookmarks
    - `M-x hoarder-browse-bookmarks`: Browse and open bookmarks
+   - M-x hoarder-sync-tag: Sync bookmarks by given tag name, storing them in a dedicated `#tagname` folder under the sync folder.
 
 ## File Format
 
