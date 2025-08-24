@@ -71,7 +71,7 @@ In Emacs:
    - `M-x hoarder-sync`: Incrementally sync bookmarks (only changed since last sync)
    - `M-x hoarder-force-sync`: Force sync all bookmarks
    - `M-x hoarder-browse-bookmarks`: Browse and open bookmarks
-   - M-x hoarder-sync-tag: Sync bookmarks by given tag name, storing them in a dedicated `#tagname` folder under the sync folder.
+   - `M-x hoarder-sync-tag`: Sync bookmarks by given tag name, storing them in a dedicated `#tagname` folder under the sync folder.
 
 ## File Format
 
