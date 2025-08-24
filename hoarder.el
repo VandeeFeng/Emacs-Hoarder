@@ -94,6 +94,7 @@ Can be 'org for Org mode format or 'markdown for Markdown format."
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c h s") 'hoarder-sync)
     (define-key map (kbd "C-c h b") 'hoarder-browse-bookmarks)
+    (define-key map (kbd "C-c h t") 'hoarder-sync-tag)
     map)
   "Keymap for Hoarder mode.")
 
@@ -477,6 +478,97 @@ If FORCE is non-nil, sync all bookmarks ignoring modified time."
   "Force sync all bookmarks from Hoarder to local files."
   (interactive)
   (hoarder-sync t))
+
+(defun hoarder--fetch-tags ()
+  "Fetch all tags from Hoarder server. Returns a list of tags alists."
+  (let ((response (hoarder--make-request "/tags" "GET" nil nil)))
+    (alist-get 'tags response)))
+
+(defun hoarder-show-tags ()
+  "Show all available tags from Hoarder in minibuffer."
+  (interactive)
+  (let ((tags (hoarder--fetch-tags)))
+    (if (and tags (listp tags))
+        (message "Tags: %s" (mapconcat (lambda (tag) (alist-get 'name tag)) tags ", "))
+      (message "No tags found or failed to fetch tags."))))
+
+(defun hoarder--get-tag-id-by-name (tag-name)
+  "Get tag ID for a given TAG-NAME, or nil if not found."
+  (let ((tags (hoarder--fetch-tags)))
+    (setq tags (or tags '()))
+    (let ((tag (seq-find (lambda (t) (string-equal (alist-get 'name t) tag-name)) tags)))
+      (when tag
+        (alist-get 'id tag)))))
+
+
+(defun hoarder--save-bookmark-in-folder (bookmark folder-path)
+  "Save BOOKMARK file in given FOLDER-PATH."
+  (hoarder--ensure-directory folder-path)
+  (let* ((title (or (alist-get 'title bookmark)
+                    (alist-get 'title (alist-get 'content bookmark))
+                    "Untitled"))
+         (created-at (alist-get 'createdAt bookmark))
+         (filename (hoarder--sanitize-filename title created-at))
+         (filepath (expand-file-name filename folder-path))
+         (bookmark-id (alist-get 'id bookmark)))
+    (unless (and (file-exists-p filepath) (not hoarder-update-existing-files))
+      (let* ((highlights (hoarder--fetch-bookmark-highlights bookmark-id))
+             (merged-content (append bookmark `((highlights . ,(alist-get 'highlights highlights)))))
+             (content (hoarder--format-bookmark merged-content)))
+        ;; Download assets if enabled
+        (when (and hoarder-download-assets (alist-get 'assets bookmark))
+          (dolist (asset (alist-get 'assets bookmark))
+            (let ((asset-id (alist-get 'id asset))
+                  (asset-type (alist-get 'assetType asset)))
+              (when (equal asset-type "image")
+                (hoarder--download-image
+                 (alist-get 'imageUrl (alist-get 'content bookmark))
+                 asset-id
+                 title)))))
+        (write-region content nil filepath)))))
+
+(defun hoarder-sync-tag (tag-name &optional force)
+  "Sync bookmarks for a given TAG-NAME incrementally or forcefully.
+If FORCE is non-nil, sync all bookmarks ignoring modified time."
+  (interactive
+   (list
+    (completing-read "Enter tag name to sync: "
+                     (mapcar (lambda (tag) (alist-get 'name tag)) (hoarder--fetch-tags))
+                     nil t)))  ;; prompt with tag completion
+  (let ((tag-id (hoarder--get-tag-id-by-name tag-name)))
+    (unless tag-id
+      (error "Tag not found: %s" tag-name))
+
+    (let ((all-bookmarks '())
+          (cursor nil)
+          (has-more t)
+          (folder-path (expand-file-name (format "#%s" tag-name) hoarder-sync-folder)))
+
+      (hoarder--ensure-directory folder-path)
+
+      (while has-more
+        (let* ((params `(("limit" . 100)
+                         ("archived" . "true")
+                         ("tagId" . ,tag-id)
+                         ,@(when cursor `(("cursor" . ,cursor)))
+                         ))
+               (response (hoarder--make-request
+                          (format "/tags/%s/bookmarks" tag-id)
+                          "GET"
+                          params
+                          nil))
+               (bookmarks (alist-get 'bookmarks response))
+               (next-cursor (alist-get 'nextCursor response)))
+          (setq all-bookmarks (append all-bookmarks bookmarks))
+          (if next-cursor
+              (setq cursor next-cursor)
+            (setq has-more nil))
+          (message "Fetched %d bookmarks so far..." (length all-bookmarks))))
+
+      (message "Processing %d bookmarks in tag '%s'..." (length all-bookmarks) tag-name)
+      (dolist (bookmark all-bookmarks)
+        (hoarder--save-bookmark-in-folder bookmark folder-path))
+      (message "Hoarder tag '%s' sync completed." tag-name))))
 
 (provide 'hoarder)
 ;;; hoarder.el ends here 
