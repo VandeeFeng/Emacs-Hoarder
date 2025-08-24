@@ -149,7 +149,7 @@ Optional CALLBACK function to handle the response."
     (error "Karakeep API key not set"))
   (unless hoarder-server-url
     (error "Karakeep server URL not set"))
-  
+
   (let* ((url-request-method method)
          (url-request-extra-headers
           `(("Authorization" . ,(concat "Bearer " hoarder-api-key))
@@ -260,7 +260,7 @@ Optional LIMIT for number of results (default 100)."
                          (alist-get 'tags bookmark))))
 
       ;; Insert YAML frontmatter
-      (insert "---\n\n")
+      (insert "---\n")
       (insert (format "title: %s\n" title))
       (when url
         (insert (format "url: %s\n" url)))
