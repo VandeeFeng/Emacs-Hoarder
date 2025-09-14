@@ -39,6 +39,19 @@ Environment variables:
 export HOARDER_API_KEY='your-hoarder-api-key'
 export HOARDER_SERVER_URL='https://your-hoarder-server'
 ```
+
+If you can not get the env in emacs :
+
+```elisp
+(use-package exec-path-from-shell
+  :ensure t
+  :config
+  (when (memq window-system '(mac ns x))
+  (exec-path-from-shell-initialize)
+  (exec-path-from-shell-copy-env "HOARDER_SERVER_URL")
+  (exec-path-from-shell-copy-env "HOARDER_API_KEY")))
+```
+
 In Emacs:
 
 ```elisp

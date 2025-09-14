@@ -26,7 +26,7 @@
   :group 'applications)
 
 (defcustom hoarder-server-url
-  (or (getenv "HOARDER_SERVER_URL") "http://localhost:3000")
+  (or (getenv "HOARDER_SERVER_URL") "")
   "Base URL of your Karakeep server.
 For self-hosted instances, this should be your server URL.
 For the demo instance, use https://try.karakeep.app"
