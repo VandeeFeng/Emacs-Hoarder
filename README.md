@@ -1,6 +1,6 @@
 # Emacs Hoarder
 
-An Emacs client for [Hoarder](https://hoarder.app), allowing you to manage your bookmarks directly from Emacs.
+An Emacs client for [Hoarder](https://hoarder.app) (now renamed to [Karakeep](https://karakeep.app)), allowing you to manage your bookmarks directly from Emacs.
 
 ## Features
 
@@ -36,6 +36,10 @@ machine hoarder-server.com login api-key password your-hoarder-api-key
 Environment variables:
 
 ```bash
+export KARAKEEP_API_KEY='your-karakeep-api-key'
+export KARAKEEP_SERVER_URL='https://your-karakeep-server'
+
+# or you prefer hoarder
 export HOARDER_API_KEY='your-hoarder-api-key'
 export HOARDER_SERVER_URL='https://your-hoarder-server'
 ```

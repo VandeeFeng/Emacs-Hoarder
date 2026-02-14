@@ -26,7 +26,9 @@
   :group 'applications)
 
 (defcustom hoarder-server-url
-  (or (getenv "HOARDER_SERVER_URL") "")
+  (or (getenv "KARAKEEP_SERVER_URL")
+      (getenv "HOARDER_SERVER_URL")
+      "")
   "Base URL of your Karakeep server.
 For self-hosted instances, this should be your server URL.
 For the demo instance, use https://try.karakeep.app"
@@ -34,7 +36,9 @@ For the demo instance, use https://try.karakeep.app"
   :group 'hoarder)
 
 (defcustom hoarder-api-key
-  (or (getenv "HOARDER_API_KEY") "")
+  (or (getenv "KARAKEEP_API_KEY")
+      (getenv "HOARDER_API_KEY")
+      "")
   "API key for Karakeep (Bearer token).
 For self-hosted instances, this should be your API key.
 For the demo instance, you can get one after logging in."
