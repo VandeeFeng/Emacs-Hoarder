@@ -26,7 +26,6 @@ An Emacs client for [Hoarder](https://hoarder.app) (now renamed to [Karakeep](ht
 
 ## Configuration
 
-
 Using `.authinfo`:
 
 ```
@@ -37,11 +36,7 @@ Environment variables:
 
 ```bash
 export KARAKEEP_API_KEY='your-karakeep-api-key'
-export KARAKEEP_SERVER_URL='https://your-karakeep-server'
-
-# or you prefer hoarder
-export HOARDER_API_KEY='your-hoarder-api-key'
-export HOARDER_SERVER_URL='https://your-hoarder-server'
+export KARAKEEP_SERVER_ADDR='https://your-karakeep-server'
 ```
 
 If you can not get the env in emacs :
@@ -52,16 +47,16 @@ If you can not get the env in emacs :
   :config
   (when (memq window-system '(mac ns x))
   (exec-path-from-shell-initialize)
-  (exec-path-from-shell-copy-env "HOARDER_SERVER_URL")
-  (exec-path-from-shell-copy-env "HOARDER_API_KEY")))
+  (exec-path-from-shell-copy-env "KARAKEEP_SERVER_ADDR")
+  (exec-path-from-shell-copy-env "KARAKEEP_API_KEY")))
 ```
 
 In Emacs:
 
 ```elisp
 ;; Set your API key (will be prompted if not set)
-(setq hoarder-api-key "your-api-key")
-(setq hoarder-server-url "https://your-server-url")
+(setq karakeep-api-key "your-api-key")
+(setq karakeep-server-addr "https://your-server-url")
 
 ;; Customize sync folder (default: ~/hoarder)
 (setq hoarder-sync-folder "~/your/path/")
@@ -71,6 +66,21 @@ In Emacs:
 (setq hoarder-update-existing-files t)  ; Update existing files during sync,default t
 (setq hoarder-exclude-archived t)       ; Exclude archived bookmarks,default t
 (setq hoarder-only-favorites nil)       ; Only sync favorite bookmarks,defult nil
+```
+
+The environment variable names follow the official [karakeep-CLI](https://docs.karakeep.app/integrations/command-line/#usage) configuration.
+
+Legacy is still supported:
+
+```bash
+export KARAKEEP_SERVER_URL='https://your-karakeep-server'
+export HOARDER_API_KEY='your-hoarder-api-key'
+export HOARDER_SERVER_URL='https://your-hoarder-server'
+```
+
+```elisp
+(setq hoarder-api-key "your-api-key")
+(setq hoarder-server-url "https://your-server-url")
 ```
 
 ## Usage
@@ -151,11 +161,3 @@ This is a note on the highlight.
 
 Your notes about the bookmark.
 ```
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.

@@ -18,15 +18,34 @@
 (require 'url)
 (require 'url-http)
 (require 'auth-source)
+(require 'cl-lib)
+(require 'seq)
+(require 'subr-x)
 
 (defvar url-mime-charset-string "utf-8")
+(defvar url-http-end-of-headers)
 
 (defgroup hoarder nil
   "Hoarder client for Emacs."
   :group 'applications)
 
+(defcustom karakeep-server-addr
+  (or (getenv "KARAKEEP_SERVER_ADDR")
+      (getenv "KARAKEEP_SERVER_URL")
+      "")
+  "Base URL of your Karakeep server."
+  :type 'string
+  :group 'hoarder)
+
+(defcustom karakeep-api-key
+  (or (getenv "KARAKEEP_API_KEY")
+      "")
+  "API key for Karakeep (Bearer token)."
+  :type 'string
+  :group 'hoarder)
+
 (defcustom hoarder-server-url
-  (or (getenv "KARAKEEP_SERVER_URL")
+  (or (and (not (string-empty-p karakeep-server-addr)) karakeep-server-addr)
       (getenv "HOARDER_SERVER_URL")
       "")
   "Base URL of your Karakeep server.
@@ -36,7 +55,7 @@ For the demo instance, use https://try.karakeep.app"
   :group 'hoarder)
 
 (defcustom hoarder-api-key
-  (or (getenv "KARAKEEP_API_KEY")
+  (or (and (not (string-empty-p karakeep-api-key)) karakeep-api-key)
       (getenv "HOARDER_API_KEY")
       "")
   "API key for Karakeep (Bearer token).
@@ -47,11 +66,6 @@ For the demo instance, you can get one after logging in."
 
 (defcustom hoarder-sync-folder "~/hoarder"
   "Folder where bookmarks will be saved."
-  :type 'directory
-  :group 'hoarder)
-
-(defcustom hoarder-attachments-folder "~/hoarder/attachments"
-  "Folder where bookmark attachments will be saved."
   :type 'directory
   :group 'hoarder)
 
@@ -70,14 +84,9 @@ For the demo instance, you can get one after logging in."
   :type 'boolean
   :group 'hoarder)
 
-(defcustom hoarder-download-assets t
-  "Whether to download bookmark assets (images, PDFs)."
-  :type 'boolean
-  :group 'hoarder)
-
 (defcustom hoarder-file-format 'org
   "Format to save bookmarks in.
-Can be 'org for Org mode format or 'markdown for Markdown format."
+Can be org for Org mode format or markdown for Markdown format."
   :type '(choice (const :tag "Org mode" org)
                  (const :tag "Markdown" markdown))
   :group 'hoarder)
@@ -130,14 +139,24 @@ Can be 'org for Org mode format or 'markdown for Markdown format."
   :keymap hoarder-mode-map
   :group 'hoarder
   (if hoarder-mode
-      (unless hoarder-api-key
+      (unless (hoarder--configured-api-key)
         (customize-set-variable
-         'hoarder-api-key
-         (read-string "Enter your Hoarder API key: ")))))
+         'karakeep-api-key
+         (read-string "Enter your Karakeep API key: ")))))
+
+(defun hoarder--configured-server-url ()
+  "Return configured Karakeep server URL."
+  (or (and (not (string-empty-p karakeep-server-addr)) karakeep-server-addr)
+      (and (not (string-empty-p hoarder-server-url)) hoarder-server-url)))
+
+(defun hoarder--configured-api-key ()
+  "Return configured Karakeep API key."
+  (or (and (not (string-empty-p karakeep-api-key)) karakeep-api-key)
+      (and (not (string-empty-p hoarder-api-key)) hoarder-api-key)))
 
 (defun hoarder--api-endpoint ()
   "Get the full API endpoint URL."
-  (concat (string-trim-right hoarder-server-url "/") "/api/v1"))
+  (concat (string-trim-right (hoarder--configured-server-url) "/") "/api/v1"))
 
 (defconst hoarder--api-path "/api/v1"
   "API path suffix.")
@@ -149,14 +168,14 @@ METHOD is the HTTP method.
 Optional PARAMS for query parameters.
 Optional DATA for request body.
 Optional CALLBACK function to handle the response."
-  (unless hoarder-api-key
+  (unless (hoarder--configured-api-key)
     (error "Karakeep API key not set"))
-  (unless hoarder-server-url
+  (unless (hoarder--configured-server-url)
     (error "Karakeep server URL not set"))
 
   (let* ((url-request-method method)
          (url-request-extra-headers
-          `(("Authorization" . ,(concat "Bearer " hoarder-api-key))
+          `(("Authorization" . ,(concat "Bearer " (hoarder--configured-api-key)))
             ("Content-Type" . "application/json")
             ("Accept" . "application/json; charset=utf-8")))
          (url-request-data (when data
@@ -318,25 +337,8 @@ Preserves Chinese characters and other valid Unicode characters."
                           "untitled"
                         ;; Only remove invalid filesystem characters
                         (replace-regexp-in-string "[/\\\\:*?\"<>|]" "" title)))
-         (date (format-time-string "%Y%m%d" (parse-iso8601-time-string created-at))))
+         (date (format-time-string "%Y%m%d" (date-to-time created-at))))
     (concat date "-" clean-title (hoarder--get-file-extension))))
-
-(defun hoarder--sanitize-asset-filename (title)
-  "Sanitize asset TITLE for use in filenames.
-Preserves Chinese characters and other valid Unicode characters."
-  (let ((clean-title (replace-regexp-in-string "[/\\\\:*?\"<>|]" "" title)))
-    (if (string-empty-p clean-title)
-        "asset"
-      clean-title)))
-
-(defun hoarder--download-image (url asset-id title)
-  "Download image from URL with ASSET-ID and TITLE."
-  (let* ((filename (hoarder--sanitize-asset-filename title))
-         (path (expand-file-name filename hoarder-attachments-folder)))
-    (when (and url (not (file-exists-p path)))
-      (hoarder--ensure-directory hoarder-attachments-folder)
-      (url-copy-file url path t)
-      path)))
 
 (defun hoarder--fetch-bookmark-highlights (bookmark-id)
   "Fetch highlights for bookmark with BOOKMARK-ID."
@@ -365,17 +367,6 @@ Preserves Chinese characters and other valid Unicode characters."
                               bookmark
                               ;; Add highlights from highlights endpoint
                               `((highlights . ,(alist-get 'highlights highlights))))))
-        ;; Download assets if enabled
-        (when (and hoarder-download-assets
-                   (alist-get 'assets bookmark))
-          (dolist (asset (alist-get 'assets bookmark))
-            (let ((asset-id (alist-get 'id asset))
-                  (asset-type (alist-get 'assetType asset)))
-              (when (equal asset-type "image")
-                (hoarder--download-image
-                 (alist-get 'imageUrl (alist-get 'content bookmark))
-                 asset-id
-                 title)))))
         ;; Save bookmark content
         (let ((content (hoarder--format-bookmark merged-content)))
           (write-region content nil filepath))))))
@@ -414,15 +405,20 @@ Preserves Chinese characters and other valid Unicode characters."
 (defvar hoarder--last-sync-time nil
   "Timestamp of the last successful sync.")
 
-(defun hoarder--save-last-sync-time ()
-  "Save the current time as last sync time."
-  (setq hoarder--last-sync-time (current-time-string))
-  (with-temp-file (expand-file-name ".last-sync-time" hoarder-sync-folder)
+(defun hoarder--last-sync-time-path (&optional folder)
+  "Return last sync time file path for FOLDER."
+  (expand-file-name ".last-sync-time" (or folder hoarder-sync-folder)))
+
+(defun hoarder--save-last-sync-time (&optional folder timestamp)
+  "Save sync start TIMESTAMP as last sync cutoff for FOLDER."
+  (setq hoarder--last-sync-time (or timestamp (current-time-string)))
+  (with-temp-file (hoarder--last-sync-time-path folder)
     (insert hoarder--last-sync-time)))
 
-(defun hoarder--load-last-sync-time ()
-  "Load last sync time from file."
-  (let ((path (expand-file-name ".last-sync-time" hoarder-sync-folder)))
+(defun hoarder--load-last-sync-time (&optional folder)
+  "Load last sync time from FOLDER."
+  (let ((path (hoarder--last-sync-time-path folder)))
+    (setq hoarder--last-sync-time nil)
     (when (file-exists-p path)
       (setq hoarder--last-sync-time
             (with-temp-buffer
@@ -432,8 +428,7 @@ Preserves Chinese characters and other valid Unicode characters."
 
 (defun hoarder--parse-time-string (time-string)
   "Parse ISO8601 TIME-STRING into time value."
-  (ignore-errors (date-to-time time-string))
-  )
+  (ignore-errors (date-to-time time-string)))
 
 (defun hoarder-sync (&optional force)
   "Sync bookmarks from Hoarder to local files incrementally or force sync.
@@ -448,7 +443,8 @@ If FORCE is non-nil, sync all bookmarks ignoring modified time."
 
   (let ((all-bookmarks '())
         (cursor nil)
-        (has-more t))
+        (has-more t)
+        (sync-start-time (current-time-string)))
     (while has-more
       (let* ((params `(("limit" . 100)
                        ,@(when cursor `(("cursor" . ,cursor)))
@@ -475,7 +471,7 @@ If FORCE is non-nil, sync all bookmarks ignoring modified time."
         (message "Fetched %d bookmarks so far..." (length all-bookmarks))))
     (message "Processing %d bookmarks..." (length all-bookmarks))
     (hoarder--process-bookmarks all-bookmarks)
-    (hoarder--save-last-sync-time)
+    (hoarder--save-last-sync-time nil sync-start-time)
     (message "Hoarder%s sync completed." (if force " forced" " incremental"))))
 
 (defun hoarder-force-sync ()
@@ -500,7 +496,7 @@ If FORCE is non-nil, sync all bookmarks ignoring modified time."
   "Get tag ID for a given TAG-NAME, or nil if not found."
   (let ((tags (hoarder--fetch-tags)))
     (setq tags (or tags '()))
-    (let ((tag (seq-find (lambda (t) (string-equal (alist-get 'name t) tag-name)) tags)))
+    (let ((tag (seq-find (lambda (tag) (string-equal (alist-get 'name tag) tag-name)) tags)))
       (when tag
         (alist-get 'id tag)))))
 
@@ -519,16 +515,6 @@ If FORCE is non-nil, sync all bookmarks ignoring modified time."
       (let* ((highlights (hoarder--fetch-bookmark-highlights bookmark-id))
              (merged-content (append bookmark `((highlights . ,(alist-get 'highlights highlights)))))
              (content (hoarder--format-bookmark merged-content)))
-        ;; Download assets if enabled
-        (when (and hoarder-download-assets (alist-get 'assets bookmark))
-          (dolist (asset (alist-get 'assets bookmark))
-            (let ((asset-id (alist-get 'id asset))
-                  (asset-type (alist-get 'assetType asset)))
-              (when (equal asset-type "image")
-                (hoarder--download-image
-                 (alist-get 'imageUrl (alist-get 'content bookmark))
-                 asset-id
-                 title)))))
         (write-region content nil filepath)))))
 
 (defun hoarder-sync-tag (tag-name &optional force)
@@ -538,7 +524,8 @@ If FORCE is non-nil, sync all bookmarks ignoring modified time."
    (list
     (completing-read "Enter tag name to sync: "
                      (mapcar (lambda (tag) (alist-get 'name tag)) (hoarder--fetch-tags))
-                     nil t)))  ;; prompt with tag completion
+                     nil t)
+    current-prefix-arg))
   (let ((tag-id (hoarder--get-tag-id-by-name tag-name)))
     (unless tag-id
       (error "Tag not found: %s" tag-name))
@@ -546,16 +533,19 @@ If FORCE is non-nil, sync all bookmarks ignoring modified time."
     (let ((all-bookmarks '())
           (cursor nil)
           (has-more t)
+          (sync-start-time (current-time-string))
           (folder-path (expand-file-name (format "#%s" tag-name) hoarder-sync-folder)))
 
       (hoarder--ensure-directory folder-path)
+      (unless force
+        (hoarder--load-last-sync-time folder-path))
 
       (while has-more
         (let* ((params `(("limit" . 100)
-                         ("archived" . "true")
                          ("tagId" . ,tag-id)
-                         ,@(when cursor `(("cursor" . ,cursor)))
-                         ))
+                         ,@(when hoarder-exclude-archived `(("archived" . "false")))
+                         ,@(when hoarder-only-favorites `(("favourited" . "true")))
+                         ,@(when cursor `(("cursor" . ,cursor)))))
                (response (hoarder--make-request
                           (format "/tags/%s/bookmarks" tag-id)
                           "GET"
@@ -563,6 +553,16 @@ If FORCE is non-nil, sync all bookmarks ignoring modified time."
                           nil))
                (bookmarks (alist-get 'bookmarks response))
                (next-cursor (alist-get 'nextCursor response)))
+          (unless force
+            (when hoarder--last-sync-time
+              (setq bookmarks
+                    (seq-filter (lambda (bookmark)
+                                  (let* ((mod-time-str (alist-get 'modifiedAt bookmark))
+                                         (mod-time (hoarder--parse-time-string mod-time-str))
+                                         (last-sync-time (hoarder--parse-time-string hoarder--last-sync-time)))
+                                    (or (null mod-time)
+                                        (not (time-less-p mod-time last-sync-time)))))
+                                bookmarks))))
           (setq all-bookmarks (append all-bookmarks bookmarks))
           (if next-cursor
               (setq cursor next-cursor)
@@ -572,6 +572,7 @@ If FORCE is non-nil, sync all bookmarks ignoring modified time."
       (message "Processing %d bookmarks in tag '%s'..." (length all-bookmarks) tag-name)
       (dolist (bookmark all-bookmarks)
         (hoarder--save-bookmark-in-folder bookmark folder-path))
+      (hoarder--save-last-sync-time folder-path sync-start-time)
       (message "Hoarder tag '%s' sync completed." tag-name))))
 
 (provide 'hoarder)
